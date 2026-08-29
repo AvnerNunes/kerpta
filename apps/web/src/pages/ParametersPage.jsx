@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 const API_URL = import.meta.env.DEV
   ? "http://localhost:3001"
@@ -9,7 +13,11 @@ function ParametersPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const productName = location.state?.productName;
+  const productName =
+    location.state?.productName;
+
+  const category =
+    location.state?.category;
 
   const [form, setForm] = useState({
     referencePrice: "",
@@ -19,15 +27,30 @@ function ParametersPage() {
     otherCosts: "",
   });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] =
+    useState(false);
 
-  if (!productName) {
-    return <Navigate to="/produto" replace />;
+  const [error, setError] =
+    useState("");
+
+  if (
+    !productName ||
+    !category?.id ||
+    !category?.name
+  ) {
+    return (
+      <Navigate
+        to="/produto"
+        replace
+      />
+    );
   }
 
   function handleChange(event) {
-    const { name, value } = event.target;
+    const {
+      name,
+      value,
+    } = event.target;
 
     setForm((current) => ({
       ...current,
@@ -46,38 +69,70 @@ function ParametersPage() {
         `${API_URL}/analysis/calculate`,
         {
           method: "POST",
+
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
+
           body: JSON.stringify({
-            referencePrice: Number(form.referencePrice),
-            marketplaceCosts: Number(
-              form.marketplaceCosts || 0
-            ),
-            freightCost: Number(form.freightCost || 0),
-            taxPercent: Number(form.taxPercent || 0),
-            otherCosts: Number(form.otherCosts || 0),
+            referencePrice:
+              Number(
+                form.referencePrice
+              ),
+
+            marketplaceCosts:
+              Number(
+                form.marketplaceCosts ||
+                  0
+              ),
+
+            freightCost:
+              Number(
+                form.freightCost || 0
+              ),
+
+            taxPercent:
+              Number(
+                form.taxPercent || 0
+              ),
+
+            otherCosts:
+              Number(
+                form.otherCosts || 0
+              ),
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      if (!response.ok || !data.success) {
+      if (
+        !response.ok ||
+        !data.success
+      ) {
         throw new Error(
-          data.error || "Não foi possível calcular."
+          data.error ||
+            "Não foi possível calcular."
         );
       }
 
-      navigate("/resultado", {
-        state: {
-          productName,
-          analysis: data.data,
-        },
-      });
+      navigate(
+        "/resultado",
+        {
+          state: {
+            productName,
+            category,
+            analysis:
+              data.data,
+          },
+        }
+      );
     } catch (err) {
       setError(
-        err.message || "Erro ao conectar com a KERPTA API."
+        err.message ||
+          "Erro ao conectar com a KERPTA API."
       );
     } finally {
       setLoading(false);
@@ -90,27 +145,47 @@ function ParametersPage() {
         <button
           type="button"
           className="back-button"
-          onClick={() => navigate("/produto")}
+          onClick={() =>
+            navigate("/produto")
+          }
         >
           ← Voltar
         </button>
 
         <header className="header">
-          <span className="brand">KERPTA</span>
-          <h1>Parâmetros da análise</h1>
+          <span className="brand">
+            KERPTA
+          </span>
+
+          <h1>
+            Parâmetros da análise
+          </h1>
+
           <p className="product-reference">
             {productName}
           </p>
+
+          <p className="product-reference">
+            {category.name}
+          </p>
         </header>
 
-        <form className="form" onSubmit={handleSubmit}>
+        <form
+          className="form"
+          onSubmit={handleSubmit}
+        >
           <label>
             Preço encontrado no Mercado Livre
+
             <input
               type="number"
               name="referencePrice"
-              value={form.referencePrice}
-              onChange={handleChange}
+              value={
+                form.referencePrice
+              }
+              onChange={
+                handleChange
+              }
               min="0"
               step="0.01"
               required
@@ -120,11 +195,16 @@ function ParametersPage() {
 
           <label>
             Custos do marketplace
+
             <input
               type="number"
               name="marketplaceCosts"
-              value={form.marketplaceCosts}
-              onChange={handleChange}
+              value={
+                form.marketplaceCosts
+              }
+              onChange={
+                handleChange
+              }
               min="0"
               step="0.01"
               placeholder="Temporário"
@@ -133,11 +213,16 @@ function ParametersPage() {
 
           <label>
             Frete
+
             <input
               type="number"
               name="freightCost"
-              value={form.freightCost}
-              onChange={handleChange}
+              value={
+                form.freightCost
+              }
+              onChange={
+                handleChange
+              }
               min="0"
               step="0.01"
               placeholder="15,99"
@@ -146,11 +231,16 @@ function ParametersPage() {
 
           <label>
             Impostos (%)
+
             <input
               type="number"
               name="taxPercent"
-              value={form.taxPercent}
-              onChange={handleChange}
+              value={
+                form.taxPercent
+              }
+              onChange={
+                handleChange
+              }
               min="0"
               step="0.01"
               placeholder="0"
@@ -159,11 +249,16 @@ function ParametersPage() {
 
           <label>
             Embalagem e outros custos
+
             <input
               type="number"
               name="otherCosts"
-              value={form.otherCosts}
-              onChange={handleChange}
+              value={
+                form.otherCosts
+              }
+              onChange={
+                handleChange
+              }
               min="0"
               step="0.01"
               placeholder="5,00"
@@ -176,7 +271,10 @@ function ParametersPage() {
             </div>
           )}
 
-          <button type="submit" disabled={loading}>
+          <button
+            type="submit"
+            disabled={loading}
+          >
             {loading
               ? "Calculando..."
               : "Calcular Custo"}
