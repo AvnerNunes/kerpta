@@ -1,9 +1,15 @@
-import { supabase } from "./supabase.js";
+import {
+  supabase,
+} from "./supabase.js";
 
 import {
   decryptToken,
   encryptToken,
 } from "./tokenCrypto.js";
+
+import {
+  getSessionFromRequest,
+} from "./session.js";
 
 const CLIENT_ID =
   process.env.MERCADOLIVRE_CLIENT_ID;
@@ -17,33 +23,56 @@ const TOKEN_URL =
 const EXPIRATION_MARGIN_MS =
   5 * 60 * 1000;
 
-function tokenIsStillValid(tokenExpiresAt) {
+function tokenIsStillValid(
+  tokenExpiresAt
+) {
   if (!tokenExpiresAt) {
     return false;
   }
 
   const expirationTime =
-    new Date(tokenExpiresAt).getTime();
+    new Date(
+      tokenExpiresAt
+    ).getTime();
 
-  if (!Number.isFinite(expirationTime)) {
+  if (
+    !Number.isFinite(
+      expirationTime
+    )
+  ) {
     return false;
   }
 
   return (
-    expirationTime - Date.now() >
+    expirationTime -
+      Date.now() >
     EXPIRATION_MARGIN_MS
   );
 }
 
-async function getConnection() {
+async function getConnection(
+  req
+) {
+  const session =
+    getSessionFromRequest(req);
+
+  if (!session?.userId) {
+    throw new Error(
+      "Sessão KERPTA inválida ou expirada."
+    );
+  }
+
   const {
     data,
     error,
   } = await supabase
-    .from("marketplace_connections")
+    .from(
+      "marketplace_connections"
+    )
     .select(
       `
         id,
+        kerpta_user_id,
         marketplace,
         marketplace_user_id,
         account_name,
@@ -54,6 +83,10 @@ async function getConnection() {
       `
     )
     .eq(
+      "kerpta_user_id",
+      session.userId
+    )
+    .eq(
       "marketplace",
       "mercadolivre"
     )
@@ -61,13 +94,6 @@ async function getConnection() {
       "status",
       "active"
     )
-    .order(
-      "updated_at",
-      {
-        ascending: false,
-      }
-    )
-    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -77,13 +103,13 @@ async function getConnection() {
     );
 
     throw new Error(
-      "Não foi possível consultar a conexão do Mercado Livre."
+      "Não foi possível consultar sua conexão com o Mercado Livre."
     );
   }
 
   if (!data) {
     throw new Error(
-      "Nenhuma conta do Mercado Livre está conectada."
+      "Nenhuma conta do Mercado Livre está conectada a este usuário."
     );
   }
 
@@ -103,7 +129,8 @@ async function refreshAccessToken(
   }
 
   if (
-    !connection.refresh_token_encrypted
+    !connection
+      .refresh_token_encrypted
   ) {
     throw new Error(
       "A conexão do Mercado Livre não possui refresh token."
@@ -112,7 +139,8 @@ async function refreshAccessToken(
 
   const refreshToken =
     decryptToken(
-      connection.refresh_token_encrypted
+      connection
+        .refresh_token_encrypted
     );
 
   const body =
@@ -169,8 +197,24 @@ async function refreshAccessToken(
       }
     );
 
+    await supabase
+      .from(
+        "marketplace_connections"
+      )
+      .update({
+        status: "error",
+
+        updated_at:
+          new Date()
+            .toISOString(),
+      })
+      .eq(
+        "id",
+        connection.id
+      );
+
     throw new Error(
-      "Não foi possível renovar a conexão com o Mercado Livre."
+      "Sua conexão com o Mercado Livre precisa ser renovada."
     );
   }
 
@@ -182,7 +226,8 @@ async function refreshAccessToken(
     data.expires_in
       ? new Date(
           Date.now() +
-            data.expires_in * 1000
+            data.expires_in *
+              1000
         ).toISOString()
       : null;
 
@@ -210,10 +255,12 @@ async function refreshAccessToken(
         "active",
 
       last_sync_at:
-        new Date().toISOString(),
+        new Date()
+          .toISOString(),
 
       updated_at:
-        new Date().toISOString(),
+        new Date()
+          .toISOString(),
     })
     .eq(
       "id",
@@ -250,19 +297,23 @@ async function refreshAccessToken(
   };
 }
 
-export async function getValidMercadoLivreAccessToken() {
+export async function getValidMercadoLivreAccessToken(
+  req
+) {
   const connection =
-    await getConnection();
+    await getConnection(req);
 
   if (
     tokenIsStillValid(
-      connection.token_expires_at
+      connection
+        .token_expires_at
     )
   ) {
     return {
       accessToken:
         decryptToken(
-          connection.access_token_encrypted
+          connection
+            .access_token_encrypted
         ),
 
       connection,

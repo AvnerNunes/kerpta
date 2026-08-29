@@ -4,26 +4,27 @@ import {
 
 const SITE_ID = "MLB";
 
-const CATEGORY_CACHE_TTL =
+const CACHE_TTL =
   1000 * 60 * 60;
+
+const MAX_RESULTS = 10;
 
 let categoryCache = {
   createdAt: 0,
   categories: [],
 };
 
-function normalizeText(value = "") {
+function normalizeText(
+  value = ""
+) {
   return String(value)
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
     .toLowerCase()
     .trim();
-}
-
-function tokenize(value) {
-  return normalizeText(value)
-    .split(/\s+/)
-    .filter(Boolean);
 }
 
 async function mercadoLivreFetch(
@@ -31,35 +32,21 @@ async function mercadoLivreFetch(
   accessToken
 ) {
   const response =
-    await fetch(url, {
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-        Accept:
-          "application/json",
-      },
-    });
+    await fetch(
+      url,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
 
-  const text =
-    await response.text();
-
-  let data;
-
-  try {
-    data =
-      text
-        ? JSON.parse(text)
-        : null;
-  } catch {
-    console.error(
-      "Resposta inválida do Mercado Livre:",
-      text.slice(0, 500)
+          Accept:
+            "application/json",
+        },
+      }
     );
 
-    throw new Error(
-      "O Mercado Livre retornou uma resposta inválida."
-    );
-  }
+  const data =
+    await response.json();
 
   if (!response.ok) {
     console.error(
@@ -80,90 +67,87 @@ async function mercadoLivreFetch(
   return data;
 }
 
-function getChildren(node) {
-  if (
-    Array.isArray(
-      node?.children_categories
-    )
-  ) {
-    return node.children_categories;
-  }
-
-  if (
-    Array.isArray(
-      node?.children
-    )
-  ) {
-    return node.children;
-  }
-
-  return [];
-}
-
-function flattenCategoryTree(
-  nodes,
-  parentPath = [],
-  result = []
+async function getCategoryDetails(
+  categoryId,
+  accessToken
 ) {
-  if (!Array.isArray(nodes)) {
-    return result;
-  }
-
-  for (const node of nodes) {
-    if (
-      !node?.id ||
-      !node?.name
-    ) {
-      continue;
-    }
-
-    const currentPath = [
-      ...parentPath,
-      {
-        id: node.id,
-        name: node.name,
-      },
-    ];
-
-    const children =
-      getChildren(node);
-
-    result.push({
-      id: node.id,
-      name: node.name,
-      path: currentPath,
-      isLeaf:
-        children.length === 0,
-      normalizedName:
-        normalizeText(
-          node.name
-        ),
-      normalizedPath:
-        normalizeText(
-          currentPath
-            .map(
-              (item) =>
-                item.name
-            )
-            .join(" ")
-        ),
-    });
-
-    if (
-      children.length > 0
-    ) {
-      flattenCategoryTree(
-        children,
-        currentPath,
-        result
-      );
-    }
-  }
-
-  return result;
+  return mercadoLivreFetch(
+    `https://api.mercadolibre.com/categories/${encodeURIComponent(
+      categoryId
+    )}`,
+    accessToken
+  );
 }
 
-async function loadAllCategories(
+async function walkCategory(
+  category,
+  accessToken,
+  parentPath,
+  result
+) {
+  const details =
+    await getCategoryDetails(
+      category.id,
+      accessToken
+    );
+
+  const currentPath =
+    Array.isArray(
+      details.path_from_root
+    ) &&
+    details.path_from_root
+      .length > 0
+      ? details.path_from_root
+      : [
+          ...parentPath,
+          {
+            id:
+              details.id ||
+              category.id,
+
+            name:
+              details.name ||
+              category.name,
+          },
+        ];
+
+  const children =
+    Array.isArray(
+      details.children_categories
+    )
+      ? details.children_categories
+      : [];
+
+  result.push({
+    id:
+      details.id ||
+      category.id,
+
+    name:
+      details.name ||
+      category.name,
+
+    path:
+      currentPath,
+
+    isLeaf:
+      children.length === 0,
+  });
+
+  for (
+    const child
+    of children
+  ) {
+    await walkCategory(
+      child,
+      accessToken,
+      currentPath,
+      result
+    );
+  }
+}
+
+async function loadCategories(
   accessToken
 ) {
   const now =
@@ -174,38 +158,38 @@ async function loadAllCategories(
       .categories.length > 0 &&
     now -
       categoryCache.createdAt <
-      CATEGORY_CACHE_TTL
+      CACHE_TTL
   ) {
     return (
       categoryCache.categories
     );
   }
 
-  const data =
+  const roots =
     await mercadoLivreFetch(
-      `https://api.mercadolibre.com/sites/${SITE_ID}/categories/all`,
+      `https://api.mercadolibre.com/sites/${SITE_ID}/categories`,
       accessToken
     );
 
-  const rootNodes =
-    Array.isArray(data)
-      ? data
-      : Array.isArray(
-          data?.categories
-        )
-        ? data.categories
-        : [];
-
-  const categories =
-    flattenCategoryTree(
-      rootNodes
-    );
-
   if (
-    categories.length === 0
+    !Array.isArray(roots)
   ) {
     throw new Error(
-      "O Mercado Livre não retornou a árvore de categorias."
+      "O Mercado Livre não retornou as categorias principais."
+    );
+  }
+
+  const categories = [];
+
+  for (
+    const root
+    of roots
+  ) {
+    await walkCategory(
+      root,
+      accessToken,
+      [],
+      categories
     );
   }
 
@@ -219,22 +203,31 @@ async function loadAllCategories(
 
 function calculateScore(
   category,
-  normalizedQuery,
-  queryTokens
+  query
 ) {
+  const normalizedQuery =
+    normalizeText(query);
+
   const name =
-    category.normalizedName;
+    normalizeText(
+      category.name
+    );
 
   const path =
-    category.normalizedPath;
-
-  let score = 0;
+    normalizeText(
+      category.path
+        .map(
+          (item) =>
+            item.name
+        )
+        .join(" ")
+    );
 
   if (
     name ===
     normalizedQuery
   ) {
-    score += 1000;
+    return 1000;
   }
 
   if (
@@ -242,7 +235,7 @@ function calculateScore(
       normalizedQuery
     )
   ) {
-    score += 500;
+    return 700;
   }
 
   if (
@@ -250,7 +243,7 @@ function calculateScore(
       normalizedQuery
     )
   ) {
-    score += 300;
+    return 500;
   }
 
   if (
@@ -258,112 +251,69 @@ function calculateScore(
       normalizedQuery
     )
   ) {
-    score += 100;
+    return 200;
   }
 
-  let matchedTokens = 0;
-
-  for (
-    const token
-    of queryTokens
-  ) {
-    if (
-      name.includes(token)
-    ) {
-      score += 40;
-      matchedTokens += 1;
-
-      continue;
-    }
-
-    if (
-      path.includes(token)
-    ) {
-      score += 15;
-      matchedTokens += 1;
-    }
-  }
-
-  if (
-    queryTokens.length > 1 &&
-    matchedTokens ===
-      queryTokens.length
-  ) {
-    score += 120;
-  }
-
-  if (category.isLeaf) {
-    score += 20;
-  }
-
-  return score;
+  return 0;
 }
 
 function searchCategories(
   categories,
   query
 ) {
-  const normalizedQuery =
-    normalizeText(query);
-
-  const queryTokens =
-    tokenize(query);
-
   return categories
-    .map((category) => ({
-      category,
-      score:
-        calculateScore(
-          category,
-          normalizedQuery,
-          queryTokens
-        ),
-    }))
+    .map(
+      (category) => ({
+        category,
+
+        score:
+          calculateScore(
+            category,
+            query
+          ),
+      })
+    )
     .filter(
       ({ score }) =>
         score > 0
     )
-    .sort((a, b) => {
-      if (
-        b.score !== a.score
-      ) {
-        return (
-          b.score -
+    .sort(
+      (a, b) => {
+        if (
+          b.score !==
           a.score
+        ) {
+          return (
+            b.score -
+            a.score
+          );
+        }
+
+        if (
+          a.category.isLeaf !==
+          b.category.isLeaf
+        ) {
+          return a.category
+            .isLeaf
+            ? -1
+            : 1;
+        }
+
+        return (
+          a.category
+            .name.length -
+          b.category
+            .name.length
         );
       }
-
-      if (
-        a.category.isLeaf !==
-        b.category.isLeaf
-      ) {
-        return a.category
-          .isLeaf
-          ? -1
-          : 1;
-      }
-
-      return (
-        a.category
-          .name.length -
-        b.category
-          .name.length
-      );
-    })
-    .slice(0, 10)
+    )
+    .slice(
+      0,
+      MAX_RESULTS
+    )
     .map(
-      ({
-        category,
-      }) => ({
-        id:
-          category.id,
-        name:
-          category.name,
-        path:
-          category.path,
-        isLeaf:
-          category.isLeaf,
-      })
+      ({ category }) =>
+        category
     );
 }
 
@@ -371,7 +321,9 @@ export default async function handler(
   req,
   res
 ) {
-  if (req.method !== "GET") {
+  if (
+    req.method !== "GET"
+  ) {
     res.setHeader(
       "Allow",
       ["GET"]
@@ -381,6 +333,7 @@ export default async function handler(
       .status(405)
       .json({
         success: false,
+
         error:
           "Método não permitido.",
       });
@@ -392,11 +345,14 @@ export default async function handler(
       ? req.query.q.trim()
       : "";
 
-  if (query.length < 2) {
+  if (
+    query.length < 2
+  ) {
     return res
       .status(400)
       .json({
         success: false,
+
         error:
           "Digite pelo menos 2 caracteres para buscar uma categoria.",
       });
@@ -411,7 +367,7 @@ export default async function handler(
       );
 
     const categories =
-      await loadAllCategories(
+      await loadCategories(
         accessToken
       );
 
@@ -425,9 +381,9 @@ export default async function handler(
       .status(200)
       .json({
         success: true,
+
         query,
-        total:
-          results.length,
+
         categories:
           results,
       });
@@ -441,6 +397,7 @@ export default async function handler(
       .status(500)
       .json({
         success: false,
+
         error:
           error.message ||
           "Não foi possível buscar categorias do Mercado Livre.",
