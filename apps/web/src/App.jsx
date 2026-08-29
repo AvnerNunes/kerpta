@@ -6,62 +6,106 @@ import {
 
 import "./App.css";
 
+import {
+  AuthProvider,
+} from "./context/AuthContext.jsx";
+
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+
+import LoginPage from "./pages/LoginPage.jsx";
 import ProductPage from "./pages/ProductPage.jsx";
 import ParametersPage from "./pages/ParametersPage.jsx";
 import ResultPage from "./pages/ResultPage.jsx";
 import ResultDetailsPage from "./pages/ResultDetailsPage.jsx";
 import MercadoLivreCallbackPage from "./pages/MercadoLivreCallbackPage.jsx";
 
+function PrivatePage({
+  children,
+}) {
+  return (
+    <ProtectedRoute>
+      {children}
+    </ProtectedRoute>
+  );
+}
+
 function App() {
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <Navigate
-            to="/produto"
-            replace
-          />
-        }
-      />
+    <AuthProvider>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to="/produto"
+              replace
+            />
+          }
+        />
 
-      <Route
-        path="/produto"
-        element={<ProductPage />}
-      />
+        <Route
+          path="/login"
+          element={
+            <LoginPage />
+          }
+        />
 
-      <Route
-        path="/parametros"
-        element={<ParametersPage />}
-      />
+        <Route
+          path="/produto"
+          element={
+            <PrivatePage>
+              <ProductPage />
+            </PrivatePage>
+          }
+        />
 
-      <Route
-        path="/resultado"
-        element={<ResultPage />}
-      />
+        <Route
+          path="/parametros"
+          element={
+            <PrivatePage>
+              <ParametersPage />
+            </PrivatePage>
+          }
+        />
 
-      <Route
-        path="/resultado/detalhes"
-        element={<ResultDetailsPage />}
-      />
+        <Route
+          path="/resultado"
+          element={
+            <PrivatePage>
+              <ResultPage />
+            </PrivatePage>
+          }
+        />
 
-      <Route
-        path="/auth/mercadolivre/callback"
-        element={
-          <MercadoLivreCallbackPage />
-        }
-      />
+        <Route
+          path="/resultado/detalhes"
+          element={
+            <PrivatePage>
+              <ResultDetailsPage />
+            </PrivatePage>
+          }
+        />
 
-      <Route
-        path="*"
-        element={
-          <Navigate
-            to="/produto"
-            replace
-          />
-        }
-      />
-    </Routes>
+        <Route
+          path="/auth/mercadolivre/callback"
+          element={
+            <PrivatePage>
+              <MercadoLivreCallbackPage />
+            </PrivatePage>
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to="/produto"
+              replace
+            />
+          }
+        />
+      </Routes>
+    </AuthProvider>
   );
 }
 
