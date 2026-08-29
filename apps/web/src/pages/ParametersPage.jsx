@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:3001";
+const API_URL = import.meta.env.DEV
+  ? "http://localhost:3001"
+  : "/api";
 
 function ParametersPage() {
   const location = useLocation();
@@ -40,24 +42,31 @@ function ParametersPage() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/analysis/calculate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          referencePrice: Number(form.referencePrice),
-          marketplaceCosts: Number(form.marketplaceCosts || 0),
-          freightCost: Number(form.freightCost || 0),
-          taxPercent: Number(form.taxPercent || 0),
-          otherCosts: Number(form.otherCosts || 0),
-        }),
-      });
+      const response = await fetch(
+        `${API_URL}/analysis/calculate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            referencePrice: Number(form.referencePrice),
+            marketplaceCosts: Number(
+              form.marketplaceCosts || 0
+            ),
+            freightCost: Number(form.freightCost || 0),
+            taxPercent: Number(form.taxPercent || 0),
+            otherCosts: Number(form.otherCosts || 0),
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "Não foi possível calcular.");
+        throw new Error(
+          data.error || "Não foi possível calcular."
+        );
       }
 
       navigate("/resultado", {
@@ -67,7 +76,9 @@ function ParametersPage() {
         },
       });
     } catch (err) {
-      setError(err.message || "Erro ao conectar com a KERPTA API.");
+      setError(
+        err.message || "Erro ao conectar com a KERPTA API."
+      );
     } finally {
       setLoading(false);
     }
@@ -86,10 +97,10 @@ function ParametersPage() {
 
         <header className="header">
           <span className="brand">KERPTA</span>
-
           <h1>Parâmetros da análise</h1>
-
-          <p className="product-reference">{productName}</p>
+          <p className="product-reference">
+            {productName}
+          </p>
         </header>
 
         <form className="form" onSubmit={handleSubmit}>
@@ -159,10 +170,16 @@ function ParametersPage() {
             />
           </label>
 
-          {error && <div className="error">{error}</div>}
+          {error && (
+            <div className="error">
+              {error}
+            </div>
+          )}
 
           <button type="submit" disabled={loading}>
-            {loading ? "Calculando..." : "Calcular Custo"}
+            {loading
+              ? "Calculando..."
+              : "Calcular Custo"}
           </button>
         </form>
       </section>
