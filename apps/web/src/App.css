@@ -368,6 +368,114 @@ button:disabled {
   line-height: 1.5;
 }
 
+/* Conta Mercado Livre */
+
+.app-topbar {
+  display: flex;
+
+  align-items: flex-start;
+
+  justify-content:
+    space-between;
+
+  gap: 20px;
+
+  margin-bottom: 32px;
+
+  padding-bottom: 20px;
+
+  border-bottom:
+    1px solid
+    var(--border);
+}
+
+.app-topbar-brand {
+  margin: 5px 0 0;
+}
+
+.marketplace-account {
+  display: flex;
+  flex-direction: column;
+
+  align-items: flex-end;
+
+  gap: 4px;
+
+  min-width: 0;
+}
+
+.marketplace-account-status {
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  color:
+    var(--green-light);
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.marketplace-status-dot {
+  width: 7px;
+  height: 7px;
+
+  flex: 0 0 7px;
+
+  border-radius: 50%;
+
+  background:
+    var(--green-light);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(49, 183, 127, 0.1);
+}
+
+.marketplace-account strong {
+  max-width: 230px;
+
+  overflow: hidden;
+
+  color: var(--text);
+
+  font-size: 13px;
+  font-weight: 700;
+
+  text-overflow:
+    ellipsis;
+
+  white-space: nowrap;
+}
+
+.logout-button {
+  margin-top: 3px;
+
+  padding: 0;
+
+  border: 0;
+
+  background:
+    transparent;
+
+  color:
+    var(--text-muted);
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.logout-button:hover {
+  color:
+    var(--text-soft);
+}
+
+.product-header {
+  margin-bottom: 30px;
+}
+
 /* Login */
 
 .login-container {
@@ -989,6 +1097,31 @@ button:disabled {
   .header h1,
   .result-page-header h1 {
     font-size: 28px;
+  }
+
+  .app-topbar {
+    align-items:
+      flex-start;
+
+    gap: 12px;
+
+    margin-bottom: 26px;
+
+    padding-bottom: 16px;
+  }
+
+  .marketplace-account {
+    max-width: 210px;
+  }
+
+  .marketplace-account-status {
+    font-size: 10px;
+  }
+
+  .marketplace-account strong {
+    max-width: 190px;
+
+    font-size: 12px;
   }
 
   .login-header h1 {

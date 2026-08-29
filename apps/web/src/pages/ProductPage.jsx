@@ -7,8 +7,18 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import {
+  useSession,
+} from "../context/SessionContext.jsx";
+
 function ProductPage() {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
+
+  const {
+    marketplace,
+    logout,
+  } = useSession();
 
   const [
     productName,
@@ -40,6 +50,11 @@ function ProductPage() {
     setCategoryError,
   ] = useState("");
 
+  const [
+    loggingOut,
+    setLoggingOut,
+  ] = useState(false);
+
   useEffect(() => {
     const query =
       categoryQuery.trim();
@@ -50,71 +65,81 @@ function ProductPage() {
     ) {
       setCategories([]);
       setCategoryError("");
+
       return;
     }
 
     const controller =
       new AbortController();
 
-    const timer = setTimeout(
-      async () => {
-        setLoadingCategories(true);
-        setCategoryError("");
+    const timer =
+      setTimeout(
+        async () => {
+          setLoadingCategories(
+            true
+          );
 
-        try {
-          const response =
-            await fetch(
-              `/api/mercadolivre/category-search?q=${encodeURIComponent(
-                query
-              )}`,
-              {
-                signal:
-                  controller.signal,
-              }
+          setCategoryError("");
+
+          try {
+            const response =
+              await fetch(
+                `/api/mercadolivre/category-search?q=${encodeURIComponent(
+                  query
+                )}`,
+                {
+                  signal:
+                    controller.signal,
+                  credentials:
+                    "include",
+                }
+              );
+
+            const data =
+              await response.json();
+
+            if (
+              !response.ok ||
+              !data.success
+            ) {
+              throw new Error(
+                data.error ||
+                  "Não foi possível buscar categorias."
+              );
+            }
+
+            setCategories(
+              data.categories ||
+                []
             );
+          } catch (error) {
+            if (
+              error.name ===
+              "AbortError"
+            ) {
+              return;
+            }
 
-          const data =
-            await response.json();
+            setCategories([]);
 
-          if (
-            !response.ok ||
-            !data.success
-          ) {
-            throw new Error(
-              data.error ||
+            setCategoryError(
+              error.message ||
                 "Não foi possível buscar categorias."
             );
+          } finally {
+            if (
+              !controller
+                .signal
+                .aborted
+            ) {
+              setLoadingCategories(
+                false
+              );
+            }
           }
-
-          setCategories(
-            data.categories || []
-          );
-        } catch (error) {
-          if (
-            error.name ===
-            "AbortError"
-          ) {
-            return;
-          }
-
-          setCategories([]);
-
-          setCategoryError(
-            error.message ||
-              "Não foi possível buscar categorias."
-          );
-        } finally {
-          if (
-            !controller.signal.aborted
-          ) {
-            setLoadingCategories(
-              false
-            );
-          }
-        }
-      },
-      400
-    );
+        },
+        400
+      );
 
     return () => {
       clearTimeout(timer);
@@ -132,7 +157,9 @@ function ProductPage() {
       event.target.value
     );
 
-    setSelectedCategory(null);
+    setSelectedCategory(
+      null
+    );
   }
 
   function handleCategorySelect(
@@ -147,10 +174,13 @@ function ProductPage() {
     );
 
     setCategories([]);
+
     setCategoryError("");
   }
 
-  function handleSubmit(event) {
+  function handleSubmit(
+    event
+  ) {
     event.preventDefault();
 
     const name =
@@ -182,43 +212,108 @@ function ProductPage() {
     );
   }
 
+  async function handleLogout() {
+    setLoggingOut(true);
+
+    try {
+      await logout();
+
+      navigate(
+        "/login",
+        {
+          replace: true,
+        }
+      );
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
   const canContinue =
-    productName.trim().length > 0 &&
-    Boolean(selectedCategory);
+    productName
+      .trim()
+      .length > 0 &&
+    Boolean(
+      selectedCategory
+    );
 
   return (
     <main className="app">
       <section className="container product-container">
-        <header className="header">
-          <span className="brand">
+        <div className="app-topbar">
+          <span className="brand app-topbar-brand">
             KERPTA
           </span>
 
+          <div className="marketplace-account">
+            <div className="marketplace-account-status">
+              <span className="marketplace-status-dot" />
+
+              <span>
+                Mercado Livre conectado
+              </span>
+            </div>
+
+            {marketplace
+              ?.accountName && (
+              <strong>
+                {
+                  marketplace.accountName
+                }
+              </strong>
+            )}
+
+            <button
+              type="button"
+              className="logout-button"
+              onClick={
+                handleLogout
+              }
+              disabled={
+                loggingOut
+              }
+            >
+              {loggingOut
+                ? "Saindo..."
+                : "Sair"}
+            </button>
+          </div>
+        </div>
+
+        <header className="header product-header">
           <h1>
             Qual produto você está
             analisando?
           </h1>
 
           <p>
-            Informe o produto e selecione
-            a categoria correspondente no
+            Informe o produto e
+            selecione a categoria
+            correspondente no
             Mercado Livre.
           </p>
         </header>
 
         <form
           className="form"
-          onSubmit={handleSubmit}
+          onSubmit={
+            handleSubmit
+          }
         >
           <label>
             Produto
 
             <input
               type="text"
-              value={productName}
-              onChange={(event) =>
+              value={
+                productName
+              }
+              onChange={(
+                event
+              ) =>
                 setProductName(
-                  event.target.value
+                  event.target
+                    .value
                 )
               }
               placeholder="Ex.: Khamrah Lattafa 100ml"
@@ -232,7 +327,9 @@ function ProductPage() {
 
               <input
                 type="text"
-                value={categoryQuery}
+                value={
+                  categoryQuery
+                }
                 onChange={
                   handleCategoryChange
                 }
@@ -243,7 +340,8 @@ function ProductPage() {
 
             {loadingCategories && (
               <p className="field-status">
-                Buscando categorias...
+                Buscando
+                categorias...
               </p>
             )}
 
@@ -314,7 +412,8 @@ function ProductPage() {
 
             {selectedCategory && (
               <p className="selected-category">
-                Categoria selecionada:{" "}
+                Categoria
+                selecionada:{" "}
                 <strong>
                   {
                     selectedCategory.name
@@ -335,8 +434,8 @@ function ProductPage() {
         </form>
 
         <p className="positioning">
-          A KERPTA calcula a compra. Você
-          decide a venda.
+          A KERPTA calcula a compra.
+          Você decide a venda.
         </p>
       </section>
     </main>

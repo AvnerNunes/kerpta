@@ -35,23 +35,42 @@ async function mercadoLivreFetch(
       headers: {
         Authorization:
           `Bearer ${accessToken}`,
-
         Accept:
           "application/json",
       },
     });
 
+  const text =
+    await response.text();
+
   let data;
 
   try {
-    data = await response.json();
+    data =
+      text
+        ? JSON.parse(text)
+        : null;
   } catch {
+    console.error(
+      "Resposta inválida do Mercado Livre:",
+      text.slice(0, 500)
+    );
+
     throw new Error(
       "O Mercado Livre retornou uma resposta inválida."
     );
   }
 
   if (!response.ok) {
+    console.error(
+      "Erro Mercado Livre:",
+      {
+        status:
+          response.status,
+        data,
+      }
+    );
+
     throw new Error(
       data?.message ||
         "Erro ao consultar categorias do Mercado Livre."
@@ -59,6 +78,26 @@ async function mercadoLivreFetch(
   }
 
   return data;
+}
+
+function getChildren(node) {
+  if (
+    Array.isArray(
+      node?.children_categories
+    )
+  ) {
+    return node.children_categories;
+  }
+
+  if (
+    Array.isArray(
+      node?.children
+    )
+  ) {
+    return node.children;
+  }
+
+  return [];
 }
 
 function flattenCategoryTree(
@@ -72,9 +111,8 @@ function flattenCategoryTree(
 
   for (const node of nodes) {
     if (
-      !node ||
-      !node.id ||
-      !node.name
+      !node?.id ||
+      !node?.name
     ) {
       continue;
     }
@@ -88,23 +126,18 @@ function flattenCategoryTree(
     ];
 
     const children =
-      Array.isArray(
-        node.children_categories
-      )
-        ? node.children_categories
-        : [];
+      getChildren(node);
 
     result.push({
       id: node.id,
       name: node.name,
       path: currentPath,
-
       isLeaf:
         children.length === 0,
-
       normalizedName:
-        normalizeText(node.name),
-
+        normalizeText(
+          node.name
+        ),
       normalizedPath:
         normalizeText(
           currentPath
@@ -116,7 +149,9 @@ function flattenCategoryTree(
         ),
     });
 
-    if (children.length > 0) {
+    if (
+      children.length > 0
+    ) {
       flattenCategoryTree(
         children,
         currentPath,
@@ -131,17 +166,19 @@ function flattenCategoryTree(
 async function loadAllCategories(
   accessToken
 ) {
-  const now = Date.now();
+  const now =
+    Date.now();
 
-  const cacheIsValid =
-    categoryCache.categories.length >
-      0 &&
+  if (
+    categoryCache
+      .categories.length > 0 &&
     now -
       categoryCache.createdAt <
-      CATEGORY_CACHE_TTL;
-
-  if (cacheIsValid) {
-    return categoryCache.categories;
+      CATEGORY_CACHE_TTL
+  ) {
+    return (
+      categoryCache.categories
+    );
   }
 
   const data =
@@ -153,12 +190,24 @@ async function loadAllCategories(
   const rootNodes =
     Array.isArray(data)
       ? data
-      : [];
+      : Array.isArray(
+          data?.categories
+        )
+        ? data.categories
+        : [];
 
   const categories =
     flattenCategoryTree(
       rootNodes
     );
+
+  if (
+    categories.length === 0
+  ) {
+    throw new Error(
+      "O Mercado Livre não retornou a árvore de categorias."
+    );
+  }
 
   categoryCache = {
     createdAt: now,
@@ -181,7 +230,10 @@ function calculateScore(
 
   let score = 0;
 
-  if (name === normalizedQuery) {
+  if (
+    name ===
+    normalizedQuery
+  ) {
     score += 1000;
   }
 
@@ -260,7 +312,6 @@ function searchCategories(
   return categories
     .map((category) => ({
       category,
-
       score:
         calculateScore(
           category,
@@ -268,18 +319,17 @@ function searchCategories(
           queryTokens
         ),
     }))
-
     .filter(
-      (item) =>
-        item.score > 0
+      ({ score }) =>
+        score > 0
     )
-
     .sort((a, b) => {
       if (
         b.score !== a.score
       ) {
         return (
-          b.score - a.score
+          b.score -
+          a.score
         );
       }
 
@@ -294,20 +344,27 @@ function searchCategories(
       }
 
       return (
-        a.category.name.length -
-        b.category.name.length
+        a.category
+          .name.length -
+        b.category
+          .name.length
       );
     })
-
     .slice(0, 10)
-
-    .map(({ category }) => ({
-      id: category.id,
-      name: category.name,
-      path: category.path,
-      isLeaf:
-        category.isLeaf,
-    }));
+    .map(
+      ({
+        category,
+      }) => ({
+        id:
+          category.id,
+        name:
+          category.name,
+        path:
+          category.path,
+        isLeaf:
+          category.isLeaf,
+      })
+    );
 }
 
 export default async function handler(
@@ -320,11 +377,13 @@ export default async function handler(
       ["GET"]
     );
 
-    return res.status(405).json({
-      success: false,
-      error:
-        "Método não permitido.",
-    });
+    return res
+      .status(405)
+      .json({
+        success: false,
+        error:
+          "Método não permitido.",
+      });
   }
 
   const query =
@@ -334,19 +393,22 @@ export default async function handler(
       : "";
 
   if (query.length < 2) {
-    return res.status(400).json({
-      success: false,
-
-      error:
-        "Digite pelo menos 2 caracteres para buscar uma categoria.",
-    });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        error:
+          "Digite pelo menos 2 caracteres para buscar uma categoria.",
+      });
   }
 
   try {
     const {
       accessToken,
     } =
-      await getValidMercadoLivreAccessToken();
+      await getValidMercadoLivreAccessToken(
+        req
+      );
 
     const categories =
       await loadAllCategories(
@@ -359,25 +421,29 @@ export default async function handler(
         query
       );
 
-    return res.status(200).json({
-      success: true,
-
-      query,
-
-      categories:
-        results,
-    });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        query,
+        total:
+          results.length,
+        categories:
+          results,
+      });
   } catch (error) {
     console.error(
       "Erro ao buscar categorias:",
       error
     );
 
-    return res.status(500).json({
-      success: false,
-
-      error:
-        "Não foi possível buscar categorias do Mercado Livre.",
-    });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        error:
+          error.message ||
+          "Não foi possível buscar categorias do Mercado Livre.",
+      });
   }
 }
