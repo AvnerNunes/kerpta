@@ -1,5 +1,6 @@
 import {
   Navigate,
+  useLocation,
 } from "react-router-dom";
 
 import {
@@ -7,10 +8,17 @@ import {
 } from "../context/SessionContext.jsx";
 
 function LoginPage() {
+  const location =
+    useLocation();
+
   const {
     authenticated,
     loading,
   } = useSession();
+
+  const message =
+    location.state?.message ||
+    "";
 
   if (loading) {
     return (
@@ -64,6 +72,12 @@ function LoginPage() {
             antes de comprar.
           </p>
         </header>
+
+        {message && (
+          <div className="error">
+            {message}
+          </div>
+        )}
 
         <div className="login-action">
           <button

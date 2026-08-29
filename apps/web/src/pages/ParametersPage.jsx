@@ -1,4 +1,6 @@
-import { useState } from "react";
+import {
+  useState,
+} from "react";
 
 import {
   Navigate,
@@ -6,11 +8,11 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-const API_URL = import.meta.env.DEV
-  ? "http://localhost:3001"
-  : "/api";
+import {
+  useSession,
+} from "../context/SessionContext.jsx";
 
-const MARKETPLACE_API_URL = "/api";
+const API_URL = "/api";
 
 const LISTING_TYPES = [
   {
@@ -46,9 +48,29 @@ const LOGISTICS = [
   },
 ];
 
+function createRequestError(
+  message,
+  status
+) {
+  const error =
+    new Error(message);
+
+  error.status =
+    status;
+
+  return error;
+}
+
 function ParametersPage() {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location =
+    useLocation();
+
+  const navigate =
+    useNavigate();
+
+  const {
+    logout,
+  } = useSession();
 
   const productName =
     location.state?.productName;
@@ -56,7 +78,10 @@ function ParametersPage() {
   const category =
     location.state?.category;
 
-  const [form, setForm] = useState({
+  const [
+    form,
+    setForm,
+  ] = useState({
     referencePrice: "",
     listingTypeId: "",
     logisticType: "",
@@ -65,11 +90,15 @@ function ParametersPage() {
     otherCosts: "",
   });
 
-  const [loading, setLoading] =
-    useState(false);
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [
+    error,
+    setError,
+  ] = useState("");
 
   if (
     !productName ||
@@ -84,16 +113,58 @@ function ParametersPage() {
     );
   }
 
-  function handleChange(event) {
+  function handleChange(
+    event
+  ) {
     const {
       name,
       value,
     } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
+    setForm(
+      (current) => ({
+        ...current,
+        [name]: value,
+      })
+    );
+  }
+
+  async function readResponse(
+    response,
+    fallbackMessage
+  ) {
+    let data;
+
+    try {
+      data =
+        await response.json();
+    } catch {
+      throw createRequestError(
+        fallbackMessage,
+        response.status
+      );
+    }
+
+    if (response.status === 401) {
+      throw createRequestError(
+        data.error ||
+          "Sua sessão expirou.",
+        401
+      );
+    }
+
+    if (
+      !response.ok ||
+      !data.success
+    ) {
+      throw createRequestError(
+        data.error ||
+          fallbackMessage,
+        response.status
+      );
+    }
+
+    return data;
   }
 
   async function getMarketplaceFee() {
@@ -114,23 +185,17 @@ function ParametersPage() {
 
     const response =
       await fetch(
-        `${MARKETPLACE_API_URL}/mercadolivre/listing-prices?${params.toString()}`
+        `${API_URL}/mercadolivre/listing-prices?${params.toString()}`,
+        {
+          credentials:
+            "include",
+        }
       );
 
-    const data =
-      await response.json();
-
-    if (
-      !response.ok ||
-      !data.success
-    ) {
-      throw new Error(
-        data.error ||
-          "Não foi possível consultar os custos do Mercado Livre."
-      );
-    }
-
-    return data;
+    return readResponse(
+      response,
+      "Não foi possível consultar os custos do Mercado Livre."
+    );
   }
 
   async function calculateAnalysis(
@@ -142,61 +207,79 @@ function ParametersPage() {
         {
           method: "POST",
 
+          credentials:
+            "include",
+
           headers: {
             "Content-Type":
               "application/json",
           },
 
-          body: JSON.stringify({
-            referencePrice:
-              Number(
-                form.referencePrice
-              ),
+          body:
+            JSON.stringify({
+              referencePrice:
+                Number(
+                  form.referencePrice
+                ),
 
-            marketplaceCosts:
-              Number(
-                marketplaceFee.amount ||
-                  0
-              ),
+              marketplaceCosts:
+                Number(
+                  marketplaceFee
+                    .amount ||
+                    0
+                ),
 
-            freightCost:
-              Number(
-                form.freightCost ||
-                  0
-              ),
+              freightCost:
+                Number(
+                  form.freightCost ||
+                    0
+                ),
 
-            taxPercent:
-              Number(
-                form.taxPercent ||
-                  0
-              ),
+              taxPercent:
+                Number(
+                  form.taxPercent ||
+                    0
+                ),
 
-            otherCosts:
-              Number(
-                form.otherCosts ||
-                  0
-              ),
-          }),
+              otherCosts:
+                Number(
+                  form.otherCosts ||
+                    0
+                ),
+            }),
         }
       );
 
     const data =
-      await response.json();
-
-    if (
-      !response.ok ||
-      !data.success
-    ) {
-      throw new Error(
-        data.error ||
-          "Não foi possível calcular."
+      await readResponse(
+        response,
+        "Não foi possível calcular o custo."
       );
-    }
 
     return data.data;
   }
 
-  async function handleSubmit(event) {
+  async function handleExpiredSession() {
+    try {
+      await logout();
+    } finally {
+      navigate(
+        "/login",
+        {
+          replace: true,
+
+          state: {
+            message:
+              "Sua sessão expirou. Entre novamente com sua conta do Mercado Livre.",
+          },
+        }
+      );
+    }
+  }
+
+  async function handleSubmit(
+    event
+  ) {
     event.preventDefault();
 
     setLoading(true);
@@ -257,6 +340,14 @@ function ParametersPage() {
         }
       );
     } catch (err) {
+      if (
+        err.status === 401
+      ) {
+        await handleExpiredSession();
+
+        return;
+      }
+
       setError(
         err.message ||
           "Erro ao realizar a análise."
@@ -273,7 +364,9 @@ function ParametersPage() {
           type="button"
           className="back-button"
           onClick={() =>
-            navigate("/produto")
+            navigate(
+              "/produto"
+            )
           }
         >
           ← Voltar
@@ -299,7 +392,9 @@ function ParametersPage() {
 
         <form
           className="form"
-          onSubmit={handleSubmit}
+          onSubmit={
+            handleSubmit
+          }
         >
           <label>
             Preço encontrado no Mercado Livre
@@ -340,8 +435,12 @@ function ParametersPage() {
               {LISTING_TYPES.map(
                 (item) => (
                   <option
-                    key={item.id}
-                    value={item.id}
+                    key={
+                      item.id
+                    }
+                    value={
+                      item.id
+                    }
                   >
                     {item.name}
                   </option>
@@ -370,8 +469,12 @@ function ParametersPage() {
               {LOGISTICS.map(
                 (item) => (
                   <option
-                    key={item.id}
-                    value={item.id}
+                    key={
+                      item.id
+                    }
+                    value={
+                      item.id
+                    }
                   >
                     {item.name}
                   </option>
@@ -442,7 +545,9 @@ function ParametersPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={
+              loading
+            }
           >
             {loading
               ? "Consultando Mercado Livre..."
