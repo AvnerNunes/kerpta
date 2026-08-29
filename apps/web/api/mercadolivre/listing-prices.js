@@ -5,6 +5,11 @@ import {
 const SITE_ID = "MLB";
 const CURRENCY_ID = "BRL";
 
+const ALLOWED_LISTING_TYPES = {
+  gold_special: "Clássico",
+  gold_pro: "Premium",
+};
+
 export default async function handler(
   req,
   res
@@ -21,6 +26,11 @@ export default async function handler(
   const categoryId =
     typeof req.query.categoryId === "string"
       ? req.query.categoryId.trim()
+      : "";
+
+  const listingTypeId =
+    typeof req.query.listingTypeId === "string"
+      ? req.query.listingTypeId.trim()
       : "";
 
   const price =
@@ -41,6 +51,18 @@ export default async function handler(
       success: false,
       error:
         "Informe um preço válido maior que zero.",
+    });
+  }
+
+  if (
+    !ALLOWED_LISTING_TYPES[
+      listingTypeId
+    ]
+  ) {
+    return res.status(400).json({
+      success: false,
+      error:
+        "Tipo de anúncio inválido. Escolha Clássico ou Premium.",
     });
   }
 
@@ -69,17 +91,24 @@ export default async function handler(
       CURRENCY_ID
     );
 
-    const response = await fetch(
-      url,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-          Accept:
-            "application/json",
-        },
-      }
+    url.searchParams.set(
+      "listing_type_id",
+      listingTypeId
     );
+
+    const response =
+      await fetch(
+        url,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+
+            Accept:
+              "application/json",
+          },
+        }
+      );
 
     const data =
       await response.json();
@@ -88,10 +117,17 @@ export default async function handler(
       console.error(
         "Erro ao consultar custos do Mercado Livre:",
         {
-          status: response.status,
-          error: data.error,
-          message: data.message,
-          cause: data.cause,
+          status:
+            response.status,
+
+          error:
+            data.error,
+
+          message:
+            data.message,
+
+          cause:
+            data.cause,
         }
       );
 
@@ -110,60 +146,72 @@ export default async function handler(
         ? data
         : [data];
 
-    const listingPrices =
-      items.map((item) => ({
-        listingTypeId:
-          item.listing_type_id,
+    const selected =
+      items.find(
+        (item) =>
+          item.listing_type_id ===
+          listingTypeId
+      );
 
-        listingTypeName:
-          item.listing_type_name,
-
-        currencyId:
-          item.currency_id,
-
-        listingFeeAmount:
-          item.listing_fee_amount,
-
-        saleFeeAmount:
-          item.sale_fee_amount,
-
-        saleFeeDetails: {
-          fixedFee:
-            item.sale_fee_details
-              ?.fixed_fee ?? 0,
-
-          financingAddOnFee:
-            item.sale_fee_details
-              ?.financing_add_on_fee ?? 0,
-
-          meliPercentageFee:
-            item.sale_fee_details
-              ?.meli_percentage_fee ?? 0,
-
-          percentageFee:
-            item.sale_fee_details
-              ?.percentage_fee ?? 0,
-        },
-      }));
+    if (!selected) {
+      return res.status(404).json({
+        success: false,
+        error:
+          "O Mercado Livre não retornou custos para esse tipo de anúncio.",
+      });
+    }
 
     return res.status(200).json({
       success: true,
 
       input: {
-        siteId: SITE_ID,
+        siteId:
+          SITE_ID,
+
         categoryId,
+
         price,
+
         currencyId:
           CURRENCY_ID,
+
+        listingTypeId,
+
+        listingTypeName:
+          ALLOWED_LISTING_TYPES[
+            listingTypeId
+          ],
+      },
+
+      fee: {
+        amount:
+          selected.sale_fee_amount ??
+          0,
+
+        percentage:
+          selected.sale_fee_details
+            ?.percentage_fee ?? 0,
+
+        fixedFee:
+          selected.sale_fee_details
+            ?.fixed_fee ?? 0,
+
+        financingAddOnFee:
+          selected.sale_fee_details
+            ?.financing_add_on_fee ??
+          0,
+
+        meliPercentageFee:
+          selected.sale_fee_details
+            ?.meli_percentage_fee ??
+          0,
       },
 
       logisticsApplied:
         false,
 
       warning:
-        "Consulta inicial sem parâmetros logísticos. Não usar este resultado como custo final da análise.",
-
-      listingPrices,
+        "A logística ainda não foi aplicada. Este valor não deve ser usado como custo final da análise.",
     });
   } catch (error) {
     console.error(
