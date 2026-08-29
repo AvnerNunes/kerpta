@@ -147,7 +147,7 @@ export default async function handler(
     );
 
     url.searchParams.set(
-      "shipping_mode",
+      "shipping_modes",
       logistics.shippingMode
     );
 
