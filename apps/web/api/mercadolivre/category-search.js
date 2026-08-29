@@ -4,6 +4,189 @@ import {
 
 const SITE_ID = "MLB";
 
+function normalizeText(value = "") {
+  return String(value)
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .toLowerCase()
+    .replace(
+      /[^a-z0-9\s]/g,
+      " "
+    )
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .trim();
+}
+
+function getTokens(value = "") {
+  return normalizeText(value)
+    .split(" ")
+    .filter(
+      (token) =>
+        token.length >= 2
+    );
+}
+
+function calculateRelevance(
+  category,
+  query
+) {
+  const normalizedQuery =
+    normalizeText(query);
+
+  const queryTokens =
+    getTokens(query);
+
+  const categoryName =
+    normalizeText(
+      category.name
+    );
+
+  const domainName =
+    normalizeText(
+      category.domainName
+    );
+
+  const pathText =
+    normalizeText(
+      Array.isArray(
+        category.path
+      )
+        ? category.path
+            .map(
+              (item) =>
+                item.name
+            )
+            .join(" ")
+        : ""
+    );
+
+  let score = 0;
+
+  /*
+   * Correspondência direta
+   */
+
+  if (
+    categoryName ===
+    normalizedQuery
+  ) {
+    score += 10000;
+  }
+
+  if (
+    categoryName.startsWith(
+      normalizedQuery
+    )
+  ) {
+    score += 5000;
+  }
+
+  if (
+    categoryName.includes(
+      normalizedQuery
+    )
+  ) {
+    score += 3000;
+  }
+
+  /*
+   * Palavras da pesquisa
+   */
+
+  let nameMatches = 0;
+  let pathMatches = 0;
+  let domainMatches = 0;
+
+  for (
+    const token
+    of queryTokens
+  ) {
+    if (
+      categoryName.includes(
+        token
+      )
+    ) {
+      nameMatches += 1;
+      score += 800;
+    }
+
+    if (
+      pathText.includes(
+        token
+      )
+    ) {
+      pathMatches += 1;
+      score += 250;
+    }
+
+    if (
+      domainName.includes(
+        token
+      )
+    ) {
+      domainMatches += 1;
+      score += 150;
+    }
+  }
+
+  /*
+   * Todos os termos aparecem
+   * no nome da categoria.
+   */
+
+  if (
+    queryTokens.length > 0 &&
+    nameMatches ===
+      queryTokens.length
+  ) {
+    score += 2000;
+  }
+
+  /*
+   * Todos os termos aparecem
+   * em algum ponto do caminho.
+   */
+
+  if (
+    queryTokens.length > 0 &&
+    pathMatches ===
+      queryTokens.length
+  ) {
+    score += 750;
+  }
+
+  /*
+   * Penaliza categorias que
+   * praticamente não possuem
+   * relação textual com a busca.
+   */
+
+  if (
+    nameMatches === 0 &&
+    pathMatches === 0 &&
+    domainMatches === 0
+  ) {
+    score -= 5000;
+  }
+
+  /*
+   * Pequena preferência por
+   * categorias finais.
+   */
+
+  if (category.isLeaf) {
+    score += 50;
+  }
+
+  return score;
+}
+
 async function getCategoryDetails(
   categoryId,
   accessToken
@@ -45,11 +228,14 @@ export default async function handler(
       ["GET"]
     );
 
-    return res.status(405).json({
-      success: false,
-      error:
-        "Método não permitido.",
-    });
+    return res
+      .status(405)
+      .json({
+        success: false,
+
+        error:
+          "Método não permitido.",
+      });
   }
 
   const query =
@@ -59,12 +245,14 @@ export default async function handler(
       : "";
 
   if (query.length < 2) {
-    return res.status(400).json({
-      success: false,
+    return res
+      .status(400)
+      .json({
+        success: false,
 
-      error:
-        "Digite pelo menos 2 caracteres para buscar uma categoria.",
-    });
+        error:
+          "Digite pelo menos 2 caracteres para buscar uma categoria.",
+      });
   }
 
   try {
@@ -85,9 +273,15 @@ export default async function handler(
       query
     );
 
+    /*
+     * Buscamos mais resultados
+     * do Mercado Livre para que
+     * a KERPTA possa reordená-los.
+     */
+
     url.searchParams.set(
       "limit",
-      "8"
+      "20"
     );
 
     const response =
@@ -140,17 +334,22 @@ export default async function handler(
     }
 
     if (!Array.isArray(data)) {
-      return res.status(200).json({
-        success: true,
-        query,
-        categories: [],
-      });
+      return res
+        .status(200)
+        .json({
+          success: true,
+          query,
+          categories: [],
+        });
     }
 
     const uniqueCategories =
       new Map();
 
-    for (const item of data) {
+    for (
+      const item
+      of data
+    ) {
       if (
         !item?.category_id ||
         !item?.category_name
@@ -184,6 +383,8 @@ export default async function handler(
             null,
 
           path: [],
+
+          isLeaf: true,
         }
       );
     }
@@ -196,7 +397,9 @@ export default async function handler(
     const categoriesWithDetails =
       await Promise.all(
         categories.map(
-          async (category) => {
+          async (
+            category
+          ) => {
             const details =
               await getCategoryDetails(
                 category.id,
@@ -214,7 +417,8 @@ export default async function handler(
                 Array.isArray(
                   details?.path_from_root
                 )
-                  ? details.path_from_root
+                  ? details
+                      .path_from_root
                   : [
                       {
                         id:
@@ -227,7 +431,8 @@ export default async function handler(
 
               isLeaf:
                 Array.isArray(
-                  details?.children_categories
+                  details
+                    ?.children_categories
                 )
                   ? details
                       .children_categories
@@ -238,26 +443,81 @@ export default async function handler(
         )
       );
 
-    return res.status(200).json({
-      success: true,
+    /*
+     * KERPTA assume o controle
+     * da relevância.
+     */
 
-      query,
+    const rankedCategories =
+      categoriesWithDetails
+        .map(
+          (category) => ({
+            ...category,
 
-      categories:
-        categoriesWithDetails,
-    });
+            relevanceScore:
+              calculateRelevance(
+                category,
+                query
+              ),
+          })
+        )
+
+        /*
+         * Remove resultados sem
+         * relação textual real.
+         */
+
+        .filter(
+          (category) =>
+            category
+              .relevanceScore >
+            0
+        )
+
+        .sort(
+          (a, b) =>
+            b.relevanceScore -
+            a.relevanceScore
+        )
+
+        .slice(0, 10)
+
+        /*
+         * Score é interno.
+         * Não enviamos ao frontend.
+         */
+
+        .map(
+          ({
+            relevanceScore,
+            ...category
+          }) => category
+        );
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+
+        query,
+
+        categories:
+          rankedCategories,
+      });
   } catch (error) {
     console.error(
       "Erro ao buscar categorias:",
       error
     );
 
-    return res.status(500).json({
-      success: false,
+    return res
+      .status(500)
+      .json({
+        success: false,
 
-      error:
-        error.message ||
-        "Não foi possível buscar categorias do Mercado Livre.",
-    });
+        error:
+          error.message ||
+          "Não foi possível buscar categorias do Mercado Livre.",
+      });
   }
 }
