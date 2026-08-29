@@ -4,7 +4,7 @@ import {
 
 import {
   getSessionFromRequest,
-} from "./_lib/session.js";
+} from "../_lib/session.js";
 
 export default function handler(
   req,
@@ -59,6 +59,7 @@ export default function handler(
   } catch (error) {
     return res.status(400).json({
       success: false,
+
       error:
         error.message ||
         "Não foi possível calcular o custo ideal.",
