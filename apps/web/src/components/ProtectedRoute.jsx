@@ -3,34 +3,36 @@ import {
 } from "react-router-dom";
 
 import {
-  useAuth,
-} from "../context/AuthContext.jsx";
+  useSession,
+} from "../context/SessionContext.jsx";
 
 function ProtectedRoute({
   children,
 }) {
   const {
-    user,
+    authenticated,
     loading,
-  } = useAuth();
+  } = useSession();
 
   if (loading) {
     return (
       <main className="app">
-        <section className="container">
-          <span className="brand">
-            KERPTA
-          </span>
+        <section className="container product-container">
+          <div className="session-loading">
+            <span className="brand">
+              KERPTA
+            </span>
 
-          <p>
-            Carregando...
-          </p>
+            <p>
+              Carregando...
+            </p>
+          </div>
         </section>
       </main>
     );
   }
 
-  if (!user) {
+  if (!authenticated) {
     return (
       <Navigate
         to="/login"

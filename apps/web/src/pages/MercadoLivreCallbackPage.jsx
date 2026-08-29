@@ -1,19 +1,37 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useNavigate,
+} from "react-router-dom";
+
+import {
+  useSession,
+} from "../context/SessionContext.jsx";
 
 function MercadoLivreCallbackPage() {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const [status, setStatus] =
-    useState("loading");
+  const {
+    checkSession,
+  } = useSession();
 
-  const [account, setAccount] =
-    useState(null);
+  const [
+    status,
+    setStatus,
+  ] = useState("loading");
 
-  const [error, setError] =
-    useState("");
+  const [
+    error,
+    setError,
+  ] = useState("");
 
   useEffect(() => {
+    let active = true;
+
     async function finishConnection() {
       try {
         const params =
@@ -33,13 +51,18 @@ function MercadoLivreCallbackPage() {
           );
         }
 
-        const response = await fetch(
-          `/api/auth/mercadolivre/callback?code=${encodeURIComponent(
-            code
-          )}&state=${encodeURIComponent(
-            state
-          )}`
-        );
+        const response =
+          await fetch(
+            `/api/auth/mercadolivre/callback?code=${encodeURIComponent(
+              code
+            )}&state=${encodeURIComponent(
+              state
+            )}`,
+            {
+              credentials:
+                "include",
+            }
+          );
 
         const data =
           await response.json();
@@ -54,20 +77,43 @@ function MercadoLivreCallbackPage() {
           );
         }
 
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
-        );
+        window.history
+          .replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
 
-        setAccount(data.account);
-        setStatus("success");
-      } catch (err) {
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
+        const authenticated =
+          await checkSession();
+
+        if (!authenticated) {
+          throw new Error(
+            "A conexão foi concluída, mas não foi possível iniciar sua sessão."
+          );
+        }
+
+        if (!active) {
+          return;
+        }
+
+        navigate(
+          "/produto",
+          {
+            replace: true,
+          }
         );
+      } catch (err) {
+        window.history
+          .replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+
+        if (!active) {
+          return;
+        }
 
         setError(
           err.message ||
@@ -79,7 +125,14 @@ function MercadoLivreCallbackPage() {
     }
 
     finishConnection();
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [
+    checkSession,
+    navigate,
+  ]);
 
   return (
     <main className="app">
@@ -89,52 +142,25 @@ function MercadoLivreCallbackPage() {
             KERPTA
           </span>
 
-          {status === "loading" && (
+          {status ===
+            "loading" && (
             <>
               <h1>
-                Conectando ao Mercado Livre
+                Entrando na KERPTA
               </h1>
 
               <p>
                 Estamos validando sua
-                autorização.
+                conta do Mercado Livre.
               </p>
             </>
           )}
 
-          {status === "success" && (
+          {status ===
+            "error" && (
             <>
               <h1>
-                Mercado Livre conectado
-              </h1>
-
-              <p>
-                A conexão foi autorizada
-                com sucesso.
-              </p>
-
-              {account && (
-                <p className="product-reference">
-                  {account.nickname}
-                </p>
-              )}
-
-              <button
-                type="button"
-                className="new-analysis-button"
-                onClick={() =>
-                  navigate("/produto")
-                }
-              >
-                Continuar
-              </button>
-            </>
-          )}
-
-          {status === "error" && (
-            <>
-              <h1>
-                Não foi possível conectar
+                Não foi possível entrar
               </h1>
 
               <div className="error">
@@ -143,20 +169,26 @@ function MercadoLivreCallbackPage() {
 
               <button
                 type="button"
-                className="new-analysis-button"
+                className="new-analysis-button callback-button"
                 onClick={() =>
-                  navigate("/produto")
+                  navigate(
+                    "/login",
+                    {
+                      replace:
+                        true,
+                    }
+                  )
                 }
               >
-                Voltar
+                Tentar novamente
               </button>
             </>
           )}
         </header>
 
         <p className="positioning">
-          A KERPTA calcula a compra. Você
-          decide a venda.
+          A KERPTA calcula a compra.
+          Você decide a venda.
         </p>
       </section>
     </main>

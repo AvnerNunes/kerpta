@@ -1,69 +1,36 @@
 import {
-  useState,
-} from "react";
-
-import {
   Navigate,
-  useNavigate,
 } from "react-router-dom";
 
 import {
-  useAuth,
-} from "../context/AuthContext.jsx";
+  useSession,
+} from "../context/SessionContext.jsx";
 
 function LoginPage() {
-  const navigate =
-    useNavigate();
-
   const {
-    user,
-    loading: authLoading,
-    signIn,
-    signUp,
-  } = useAuth();
+    authenticated,
+    loading,
+  } = useSession();
 
-  const [mode, setMode] =
-    useState("login");
-
-  const [email, setEmail] =
-    useState("");
-
-  const [
-    password,
-    setPassword,
-  ] = useState("");
-
-  const [
-    confirmPassword,
-    setConfirmPassword,
-  ] = useState("");
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  const [message, setMessage] =
-    useState("");
-
-  if (authLoading) {
+  if (loading) {
     return (
       <main className="app">
         <section className="container product-container">
-          <span className="brand">
-            KERPTA
-          </span>
+          <div className="session-loading">
+            <span className="brand">
+              KERPTA
+            </span>
 
-          <p>
-            Carregando...
-          </p>
+            <p>
+              Carregando...
+            </p>
+          </div>
         </section>
       </main>
     );
   }
 
-  if (user) {
+  if (authenticated) {
     return (
       <Navigate
         to="/produto"
@@ -72,306 +39,65 @@ function LoginPage() {
     );
   }
 
-  function changeMode(
-    newMode
-  ) {
-    setMode(newMode);
-    setError("");
-    setMessage("");
-    setPassword("");
-    setConfirmPassword("");
+  function connectMercadoLivre() {
+    window.location.href =
+      "/api/auth/mercadolivre/start";
   }
-
-  async function handleSubmit(
-    event
-  ) {
-    event.preventDefault();
-
-    setError("");
-    setMessage("");
-
-    const cleanEmail =
-      email.trim()
-        .toLowerCase();
-
-    if (!cleanEmail) {
-      setError(
-        "Informe seu e-mail."
-      );
-
-      return;
-    }
-
-    if (
-      password.length < 6
-    ) {
-      setError(
-        "A senha deve possuir pelo menos 6 caracteres."
-      );
-
-      return;
-    }
-
-    if (
-      mode === "register" &&
-      password !==
-        confirmPassword
-    ) {
-      setError(
-        "As senhas não são iguais."
-      );
-
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (
-        mode === "register"
-      ) {
-        const {
-          data,
-          error:
-            signUpError,
-        } =
-          await signUp(
-            cleanEmail,
-            password
-          );
-
-        if (signUpError) {
-          throw signUpError;
-        }
-
-        if (data.session) {
-          navigate(
-            "/produto",
-            {
-              replace: true,
-            }
-          );
-
-          return;
-        }
-
-        setMessage(
-          "Cadastro realizado. Verifique seu e-mail para confirmar sua conta."
-        );
-
-        return;
-      }
-
-      const {
-        error:
-          signInError,
-      } =
-        await signIn(
-          cleanEmail,
-          password
-        );
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      navigate(
-        "/produto",
-        {
-          replace: true,
-        }
-      );
-    } catch (err) {
-      if (
-        err.message ===
-        "Invalid login credentials"
-      ) {
-        setError(
-          "E-mail ou senha incorretos."
-        );
-
-        return;
-      }
-
-      if (
-        err.message ===
-        "Email not confirmed"
-      ) {
-        setError(
-          "Confirme seu e-mail antes de entrar."
-        );
-
-        return;
-      }
-
-      if (
-        err.message
-          ?.toLowerCase()
-          .includes(
-            "already registered"
-          )
-      ) {
-        setError(
-          "Este e-mail já possui uma conta."
-        );
-
-        return;
-      }
-
-      setError(
-        err.message ||
-          "Não foi possível concluir a operação."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const isRegister =
-    mode === "register";
 
   return (
     <main className="app">
-      <section className="container product-container">
-        <header className="header">
+      <section className="container product-container login-container">
+        <header className="login-header">
           <span className="brand">
             KERPTA
           </span>
 
           <h1>
-            {isRegister
-              ? "Crie sua conta"
-              : "Entre na KERPTA"}
+            Compre certo.
+            <br />
+            Venda competitivo.
           </h1>
 
           <p>
-            {isRegister
-              ? "Comece a calcular quanto você pode pagar pelos produtos que pretende vender."
-              : "Acesse sua conta para realizar suas análises."}
+            Descubra quanto você
+            pode pagar por um produto
+            antes de comprar.
           </p>
         </header>
 
-        <form
-          className="form"
-          onSubmit={
-            handleSubmit
-          }
-        >
-          <label>
-            E-mail
-
-            <input
-              type="email"
-              value={email}
-              onChange={(
-                event
-              ) =>
-                setEmail(
-                  event.target
-                    .value
-                )
-              }
-              autoComplete="email"
-              required
-              placeholder="seu@email.com"
-            />
-          </label>
-
-          <label>
-            Senha
-
-            <input
-              type="password"
-              value={password}
-              onChange={(
-                event
-              ) =>
-                setPassword(
-                  event.target
-                    .value
-                )
-              }
-              autoComplete={
-                isRegister
-                  ? "new-password"
-                  : "current-password"
-              }
-              minLength={6}
-              required
-              placeholder="Sua senha"
-            />
-          </label>
-
-          {isRegister && (
-            <label>
-              Confirme sua senha
-
-              <input
-                type="password"
-                value={
-                  confirmPassword
-                }
-                onChange={(
-                  event
-                ) =>
-                  setConfirmPassword(
-                    event.target
-                      .value
-                  )
-                }
-                autoComplete="new-password"
-                minLength={6}
-                required
-                placeholder="Digite novamente"
-              />
-            </label>
-          )}
-
-          {error && (
-            <div className="error">
-              {error}
-            </div>
-          )}
-
-          {message && (
-            <div className="auth-success">
-              {message}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-          >
-            {loading
-              ? "Aguarde..."
-              : isRegister
-                ? "Criar conta"
-                : "Entrar"}
-          </button>
-        </form>
-
-        <div className="auth-switch">
-          <span>
-            {isRegister
-              ? "Já possui uma conta?"
-              : "Ainda não possui uma conta?"}
-          </span>
-
+        <div className="login-action">
           <button
             type="button"
-            onClick={() =>
-              changeMode(
-                isRegister
-                  ? "login"
-                  : "register"
-              )
+            className="mercadolivre-login-button"
+            onClick={
+              connectMercadoLivre
             }
           >
-            {isRegister
-              ? "Entrar"
-              : "Criar conta grátis"}
+            Continuar com Mercado Livre
           </button>
+
+          <p className="secure-connection">
+            Conexão segura através do
+            Mercado Livre
+          </p>
+        </div>
+
+        <div className="login-value">
+          <span>
+            KERPTA FREE
+          </span>
+
+          <strong>
+            Descubra seu custo máximo
+            de compra.
+          </strong>
+
+          <p>
+            Considere comissão,
+            logística, impostos e
+            margem antes de fechar
+            uma compra.
+          </p>
         </div>
 
         <p className="positioning">

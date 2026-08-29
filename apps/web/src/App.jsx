@@ -7,8 +7,8 @@ import {
 import "./App.css";
 
 import {
-  AuthProvider,
-} from "./context/AuthContext.jsx";
+  SessionProvider,
+} from "./context/SessionContext.jsx";
 
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
@@ -31,7 +31,7 @@ function PrivatePage({
 
 function App() {
   return (
-    <AuthProvider>
+    <SessionProvider>
       <Routes>
         <Route
           path="/"
@@ -47,6 +47,13 @@ function App() {
           path="/login"
           element={
             <LoginPage />
+          }
+        />
+
+        <Route
+          path="/auth/mercadolivre/callback"
+          element={
+            <MercadoLivreCallbackPage />
           }
         />
 
@@ -87,15 +94,6 @@ function App() {
         />
 
         <Route
-          path="/auth/mercadolivre/callback"
-          element={
-            <PrivatePage>
-              <MercadoLivreCallbackPage />
-            </PrivatePage>
-          }
-        />
-
-        <Route
           path="*"
           element={
             <Navigate
@@ -105,7 +103,7 @@ function App() {
           }
         />
       </Routes>
-    </AuthProvider>
+    </SessionProvider>
   );
 }
 
