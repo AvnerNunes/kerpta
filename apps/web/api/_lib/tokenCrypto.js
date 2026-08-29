@@ -46,3 +46,53 @@ export function encryptToken(value) {
     encrypted.toString("base64"),
   ].join(".");
 }
+
+export function decryptToken(value) {
+  if (!value) {
+    return null;
+  }
+
+  const parts = value.split(".");
+
+  if (parts.length !== 3) {
+    throw new Error(
+      "Token criptografado possui formato inválido."
+    );
+  }
+
+  const [
+    ivBase64,
+    authTagBase64,
+    encryptedBase64,
+  ] = parts;
+
+  const iv = Buffer.from(
+    ivBase64,
+    "base64"
+  );
+
+  const authTag = Buffer.from(
+    authTagBase64,
+    "base64"
+  );
+
+  const encrypted = Buffer.from(
+    encryptedBase64,
+    "base64"
+  );
+
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    ENCRYPTION_KEY,
+    iv
+  );
+
+  decipher.setAuthTag(authTag);
+
+  const decrypted = Buffer.concat([
+    decipher.update(encrypted),
+    decipher.final(),
+  ]);
+
+  return decrypted.toString("utf8");
+}
