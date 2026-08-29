@@ -10,6 +10,33 @@ const ALLOWED_LISTING_TYPES = {
   gold_pro: "Premium",
 };
 
+const ALLOWED_LOGISTICS = {
+  drop_off: {
+    name: "Mercado Envios - Agência/Drop Off",
+    shippingMode: "me2",
+  },
+
+  cross_docking: {
+    name: "Mercado Envios - Coleta",
+    shippingMode: "me2",
+  },
+
+  self_service: {
+    name: "Mercado Envios Flex",
+    shippingMode: "me2",
+  },
+
+  fulfillment: {
+    name: "Mercado Envios Full",
+    shippingMode: "me2",
+  },
+
+  custom: {
+    name: "Envio próprio/personalizado",
+    shippingMode: "custom",
+  },
+};
+
 export default async function handler(
   req,
   res
@@ -31,6 +58,11 @@ export default async function handler(
   const listingTypeId =
     typeof req.query.listingTypeId === "string"
       ? req.query.listingTypeId.trim()
+      : "";
+
+  const logisticType =
+    typeof req.query.logisticType === "string"
+      ? req.query.logisticType.trim()
       : "";
 
   const price =
@@ -66,6 +98,19 @@ export default async function handler(
     });
   }
 
+  const logistics =
+    ALLOWED_LOGISTICS[
+      logisticType
+    ];
+
+  if (!logistics) {
+    return res.status(400).json({
+      success: false,
+      error:
+        "Selecione uma logística válida.",
+    });
+  }
+
   try {
     const {
       accessToken,
@@ -94,6 +139,16 @@ export default async function handler(
     url.searchParams.set(
       "listing_type_id",
       listingTypeId
+    );
+
+    url.searchParams.set(
+      "logistic_type",
+      logisticType
+    );
+
+    url.searchParams.set(
+      "shipping_mode",
+      logistics.shippingMode
     );
 
     const response =
@@ -143,13 +198,13 @@ export default async function handler(
 
     const items =
       Array.isArray(data)
-        ? data
+        ? data.flat(Infinity)
         : [data];
 
     const selected =
       items.find(
         (item) =>
-          item.listing_type_id ===
+          item?.listing_type_id ===
           listingTypeId
       );
 
@@ -157,7 +212,7 @@ export default async function handler(
       return res.status(404).json({
         success: false,
         error:
-          "O Mercado Livre não retornou custos para esse tipo de anúncio.",
+          "O Mercado Livre não retornou custos para essa combinação.",
       });
     }
 
@@ -181,6 +236,14 @@ export default async function handler(
           ALLOWED_LISTING_TYPES[
             listingTypeId
           ],
+
+        logisticType,
+
+        logisticName:
+          logistics.name,
+
+        shippingMode:
+          logistics.shippingMode,
       },
 
       fee: {
@@ -208,10 +271,7 @@ export default async function handler(
       },
 
       logisticsApplied:
-        false,
-
-      warning:
-        "A logística ainda não foi aplicada. Este valor não deve ser usado como custo final da análise.",
+        true,
     });
   } catch (error) {
     console.error(
