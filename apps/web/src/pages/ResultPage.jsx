@@ -1,21 +1,61 @@
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 function ResultPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const productName = location.state?.productName;
-  const analysis = location.state?.analysis;
+  const productName =
+    location.state?.productName;
 
-  if (!productName || !analysis) {
-    return <Navigate to="/produto" replace />;
+  const category =
+    location.state?.category;
+
+  const marketplace =
+    location.state?.marketplace;
+
+  const analysis =
+    location.state?.analysis;
+
+  if (
+    !productName ||
+    !category ||
+    !marketplace ||
+    !analysis
+  ) {
+    return (
+      <Navigate
+        to="/produto"
+        replace
+      />
+    );
   }
 
   function formatCurrency(value) {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
+    return new Intl.NumberFormat(
+      "pt-BR",
+      {
+        style: "currency",
+        currency: "BRL",
+      }
+    ).format(value);
+  }
+
+  function handleDetails() {
+    navigate(
+      "/resultado/detalhes",
+      {
+        state: {
+          productName,
+          category,
+          marketplace,
+          analysis,
+        },
+      }
+    );
   }
 
   return (
@@ -24,53 +64,106 @@ function ResultPage() {
         <button
           type="button"
           className="back-button"
-          onClick={() => navigate(-1)}
+          onClick={() =>
+            navigate(-1)
+          }
         >
           ← Voltar
         </button>
 
         <header className="result-page-header">
-          <span className="brand">KERPTA</span>
+          <span className="brand">
+            KERPTA
+          </span>
 
-          <p className="product-reference">{productName}</p>
+          <p className="product-reference">
+            {productName}
+          </p>
 
-          <span className="result-label">CUSTO IDEAL DE COMPRA</span>
+          <span className="result-label">
+            CUSTO IDEAL DE COMPRA
+          </span>
 
-          <h1>Quanto você pode pagar para atingir cada margem.</h1>
+          <h1>
+            Quanto você pode pagar para
+            atingir cada margem.
+          </h1>
         </header>
 
         <div className="margin-grid">
-          {analysis.margins.map((item) => (
-            <article
-              className={`margin-card ${
-                item.viable ? "" : "margin-card-inviable"
-              }`}
-              key={item.marginPercent}
-            >
-              <span>Margem {item.marginPercent}%</span>
+          {analysis.margins.map(
+            (item) => (
+              <article
+                className={`margin-card ${
+                  item.viable
+                    ? ""
+                    : "margin-card-inviable"
+                }`}
+                key={
+                  item.marginPercent
+                }
+              >
+                <span className="margin-title">
+                  Margem{" "}
+                  {item.marginPercent}%
+                </span>
 
-              <strong>{formatCurrency(item.idealCost)}</strong>
+                <div className="maximum-cost">
+                  <span>
+                    Custo Máximo:
+                  </span>
 
-              {!item.viable && <small>Inviável</small>}
-            </article>
-          ))}
+                  <strong>
+                    {formatCurrency(
+                      item.idealCost
+                    )}
+                  </strong>
+                </div>
+
+                {!item.viable && (
+                  <small>
+                    Inviável
+                  </small>
+                )}
+              </article>
+            )
+          )}
         </div>
 
-        <div className="break-even">
-          <span>Limite de equilíbrio</span>
-          <strong>{formatCurrency(analysis.breakEvenCost)}</strong>
+        <div className="no-profit-margin">
+          <span>
+            MARGEM SEM LUCRO
+          </span>
+
+          <strong>
+            Custo de{" "}
+            {formatCurrency(
+              analysis.breakEvenCost
+            )}
+          </strong>
         </div>
 
         <button
           type="button"
+          className="details-button"
+          onClick={handleDetails}
+        >
+          Ver detalhes do cálculo
+        </button>
+
+        <button
+          type="button"
           className="new-analysis-button"
-          onClick={() => navigate("/produto")}
+          onClick={() =>
+            navigate("/produto")
+          }
         >
           Nova análise
         </button>
 
         <p className="positioning">
-          A KERPTA calcula a compra. Você decide a venda.
+          A KERPTA calcula a compra. Você
+          decide a venda.
         </p>
       </section>
     </main>

@@ -1,16 +1,20 @@
-import { useState } from "react";
-
 import {
   Navigate,
   useLocation,
   useNavigate,
 } from "react-router-dom";
 
-const API_URL = import.meta.env.DEV
-  ? "http://localhost:3001"
-  : "/api";
+import {
+  useState,
+} from "react";
 
-const MARKETPLACE_API_URL = "/api";
+const API_URL =
+  import.meta.env.DEV
+    ? "http://localhost:3001"
+    : "/api";
+
+const MARKETPLACE_API_URL =
+  "/api";
 
 const LISTING_TYPES = [
   {
@@ -46,7 +50,7 @@ const LOGISTICS = [
   },
 ];
 
-function ParametersPage() {
+function ResultDetailsPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -56,14 +60,38 @@ function ParametersPage() {
   const category =
     location.state?.category;
 
-  const [form, setForm] = useState({
-    referencePrice: "",
-    listingTypeId: "",
-    logisticType: "",
-    freightCost: "",
-    taxPercent: "",
-    otherCosts: "",
-  });
+  const marketplace =
+    location.state?.marketplace;
+
+  const analysis =
+    location.state?.analysis;
+
+  const [form, setForm] =
+    useState({
+      referencePrice:
+        analysis?.referencePrice ??
+        "",
+
+      listingTypeId:
+        marketplace
+          ?.listingTypeId ?? "",
+
+      logisticType:
+        marketplace
+          ?.logisticType ?? "",
+
+      freightCost:
+        analysis?.freightCost ??
+        "",
+
+      taxPercent:
+        analysis?.taxPercent ??
+        "",
+
+      otherCosts:
+        analysis?.otherCosts ??
+        "",
+    });
 
   const [loading, setLoading] =
     useState(false);
@@ -74,7 +102,9 @@ function ParametersPage() {
   if (
     !productName ||
     !category?.id ||
-    !category?.name
+    !category?.name ||
+    !marketplace ||
+    !analysis
   ) {
     return (
       <Navigate
@@ -82,6 +112,26 @@ function ParametersPage() {
         replace
       />
     );
+  }
+
+  function formatCurrency(value) {
+    return new Intl.NumberFormat(
+      "pt-BR",
+      {
+        style: "currency",
+        currency: "BRL",
+      }
+    ).format(value ?? 0);
+  }
+
+  function formatPercent(value) {
+    return new Intl.NumberFormat(
+      "pt-BR",
+      {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }
+    ).format(value ?? 0);
   }
 
   function handleChange(event) {
@@ -189,14 +239,16 @@ function ParametersPage() {
     ) {
       throw new Error(
         data.error ||
-          "Não foi possível calcular."
+          "Não foi possível recalcular a análise."
       );
     }
 
     return data.data;
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(
+    event
+  ) {
     event.preventDefault();
 
     setLoading(true);
@@ -206,7 +258,7 @@ function ParametersPage() {
       const marketplaceData =
         await getMarketplaceFee();
 
-      const analysis =
+      const newAnalysis =
         await calculateAnalysis(
           marketplaceData.fee
         );
@@ -228,6 +280,8 @@ function ParametersPage() {
       navigate(
         "/resultado",
         {
+          replace: true,
+
           state: {
             productName,
             category,
@@ -252,14 +306,15 @@ function ParametersPage() {
                 marketplaceData.fee,
             },
 
-            analysis,
+            analysis:
+              newAnalysis,
           },
         }
       );
     } catch (err) {
       setError(
         err.message ||
-          "Erro ao realizar a análise."
+          "Erro ao recalcular a análise."
       );
     } finally {
       setLoading(false);
@@ -273,10 +328,10 @@ function ParametersPage() {
           type="button"
           className="back-button"
           onClick={() =>
-            navigate("/produto")
+            navigate(-1)
           }
         >
-          ← Voltar
+          ← Voltar ao resultado
         </button>
 
         <header className="header">
@@ -285,7 +340,7 @@ function ParametersPage() {
           </span>
 
           <h1>
-            Parâmetros da análise
+            Detalhes do cálculo
           </h1>
 
           <p className="product-reference">
@@ -302,7 +357,7 @@ function ParametersPage() {
           onSubmit={handleSubmit}
         >
           <label>
-            Preço encontrado no Mercado Livre
+            Preço de referência
 
             <input
               type="number"
@@ -316,7 +371,6 @@ function ParametersPage() {
               min="0.01"
               step="0.01"
               required
-              placeholder="280,00"
             />
           </label>
 
@@ -333,10 +387,6 @@ function ParametersPage() {
               }
               required
             >
-              <option value="">
-                Selecione
-              </option>
-
               {LISTING_TYPES.map(
                 (item) => (
                   <option
@@ -363,10 +413,6 @@ function ParametersPage() {
               }
               required
             >
-              <option value="">
-                Selecione
-              </option>
-
               {LOGISTICS.map(
                 (item) => (
                   <option
@@ -379,6 +425,51 @@ function ParametersPage() {
               )}
             </select>
           </label>
+
+          <div className="detail-row">
+            <span>
+              Comissão Mercado Livre
+            </span>
+
+            <strong>
+              {formatCurrency(
+                marketplace.fee
+                  ?.amount
+              )}
+            </strong>
+          </div>
+
+          <div className="detail-row">
+            <span>
+              Percentual da comissão
+            </span>
+
+            <strong>
+              {formatPercent(
+                marketplace.fee
+                  ?.percentage
+              )}
+              %
+            </strong>
+          </div>
+
+          {Number(
+            marketplace.fee
+              ?.fixedFee
+          ) > 0 && (
+            <div className="detail-row">
+              <span>
+                Tarifa fixa
+              </span>
+
+              <strong>
+                {formatCurrency(
+                  marketplace.fee
+                    .fixedFee
+                )}
+              </strong>
+            </div>
+          )}
 
           <label>
             Frete pago pelo vendedor
@@ -394,7 +485,6 @@ function ParametersPage() {
               }
               min="0"
               step="0.01"
-              placeholder="15,99"
             />
           </label>
 
@@ -412,7 +502,6 @@ function ParametersPage() {
               }
               min="0"
               step="0.01"
-              placeholder="0"
             />
           </label>
 
@@ -430,9 +519,14 @@ function ParametersPage() {
               }
               min="0"
               step="0.01"
-              placeholder="5,00"
             />
           </label>
+
+          <p className="field-status">
+            A comissão do Mercado Livre
+            será consultada novamente ao
+            recalcular.
+          </p>
 
           {error && (
             <div className="error">
@@ -445,13 +539,18 @@ function ParametersPage() {
             disabled={loading}
           >
             {loading
-              ? "Consultando Mercado Livre..."
-              : "Calcular Custo"}
+              ? "Recalculando..."
+              : "Recalcular análise"}
           </button>
         </form>
+
+        <p className="positioning">
+          A KERPTA calcula a compra. Você
+          decide a venda.
+        </p>
       </section>
     </main>
   );
 }
 
-export default ParametersPage;
+export default ResultDetailsPage;
