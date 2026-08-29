@@ -2,12 +2,16 @@
   "name": "kerpta",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
     "dev:web": "npm run dev --workspace=@kerpta/web",
-    "dev:api": "npm run dev --workspace=@kerpta/api"
+    "dev:api": "npm run dev --workspace=@kerpta/api",
+    "test:core": "npm test --workspace=@kerpta/core"
   }
 }
