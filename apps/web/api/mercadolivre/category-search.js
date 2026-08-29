@@ -281,7 +281,7 @@ export default async function handler(
 
     url.searchParams.set(
       "limit",
-      "20"
+      "8"
     );
 
     const response =
