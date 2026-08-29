@@ -1,41 +1,75 @@
-import { supabase } from "../../_lib/supabase.js";
-import { encryptToken } from "../../_lib/tokenCrypto.js";
+import {
+  supabase,
+} from "../../_lib/supabase.js";
+
+import {
+  encryptToken,
+} from "../../_lib/tokenCrypto.js";
+
+import {
+  createSessionCookie,
+} from "../../_lib/session.js";
 
 const CLIENT_ID =
-  process.env.MERCADOLIVRE_CLIENT_ID;
+  process.env
+    .MERCADOLIVRE_CLIENT_ID;
 
 const CLIENT_SECRET =
-  process.env.MERCADOLIVRE_CLIENT_SECRET;
+  process.env
+    .MERCADOLIVRE_CLIENT_SECRET;
 
 const REDIRECT_URI =
   "https://kerpta-web.vercel.app/auth/mercadolivre/callback";
 
-function parseCookies(cookieHeader = "") {
+function parseCookies(
+  cookieHeader = ""
+) {
   return cookieHeader
     .split(";")
-    .map((cookie) => cookie.trim())
+    .map(
+      (cookie) =>
+        cookie.trim()
+    )
     .filter(Boolean)
-    .reduce((cookies, cookie) => {
-      const separatorIndex = cookie.indexOf("=");
+    .reduce(
+      (
+        cookies,
+        cookie
+      ) => {
+        const separatorIndex =
+          cookie.indexOf("=");
 
-      if (separatorIndex === -1) {
+        if (
+          separatorIndex === -1
+        ) {
+          return cookies;
+        }
+
+        const name =
+          cookie.slice(
+            0,
+            separatorIndex
+          );
+
+        const value =
+          cookie.slice(
+            separatorIndex + 1
+          );
+
+        try {
+          cookies[name] =
+            decodeURIComponent(
+              value
+            );
+        } catch {
+          cookies[name] =
+            value;
+        }
+
         return cookies;
-      }
-
-      const name = cookie.slice(
-        0,
-        separatorIndex
-      );
-
-      const value = cookie.slice(
-        separatorIndex + 1
-      );
-
-      cookies[name] =
-        decodeURIComponent(value);
-
-      return cookies;
-    }, {});
+      },
+      {}
+    );
 }
 
 function clearCookie(name) {
@@ -49,17 +83,99 @@ function clearCookie(name) {
   ].join("; ");
 }
 
-export default async function handler(req, res) {
+async function findConnection(
+  marketplaceUserId
+) {
+  const {
+    data,
+    error,
+  } = await supabase
+    .from(
+      "marketplace_connections"
+    )
+    .select(
+      `
+        id,
+        kerpta_user_id
+      `
+    )
+    .eq(
+      "marketplace",
+      "mercadolivre"
+    )
+    .eq(
+      "marketplace_user_id",
+      marketplaceUserId
+    )
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function createKerptaUser() {
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("kerpta_users")
+    .insert({
+      status: "active",
+      plan: "free",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function ensureKerptaUser(
+  existingConnection
+) {
+  if (
+    existingConnection
+      ?.kerpta_user_id
+  ) {
+    return (
+      existingConnection
+        .kerpta_user_id
+    );
+  }
+
+  const newUser =
+    await createKerptaUser();
+
+  return newUser.id;
+}
+
+export default async function handler(
+  req,
+  res
+) {
   if (req.method !== "GET") {
-    res.setHeader("Allow", ["GET"]);
+    res.setHeader(
+      "Allow",
+      ["GET"]
+    );
 
     return res.status(405).json({
       success: false,
-      error: "Método não permitido.",
+      error:
+        "Método não permitido.",
     });
   }
 
-  if (!CLIENT_ID || !CLIENT_SECRET) {
+  if (
+    !CLIENT_ID ||
+    !CLIENT_SECRET
+  ) {
     return res.status(500).json({
       success: false,
       error:
@@ -67,7 +183,10 @@ export default async function handler(req, res) {
     });
   }
 
-  const { code, state } = req.query;
+  const {
+    code,
+    state,
+  } = req.query;
 
   if (!code || !state) {
     return res.status(400).json({
@@ -77,15 +196,18 @@ export default async function handler(req, res) {
     });
   }
 
-  const cookies = parseCookies(
-    req.headers.cookie
-  );
+  const cookies =
+    parseCookies(
+      req.headers.cookie
+    );
 
   const storedState =
-    cookies.kerpta_ml_oauth_state;
+    cookies
+      .kerpta_ml_oauth_state;
 
   const codeVerifier =
-    cookies.kerpta_ml_code_verifier;
+    cookies
+      .kerpta_ml_code_verifier;
 
   if (
     !storedState ||
@@ -104,25 +226,39 @@ export default async function handler(req, res) {
       new URLSearchParams({
         grant_type:
           "authorization_code",
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
+
+        client_id:
+          CLIENT_ID,
+
+        client_secret:
+          CLIENT_SECRET,
+
         code,
-        redirect_uri: REDIRECT_URI,
-        code_verifier: codeVerifier,
+
+        redirect_uri:
+          REDIRECT_URI,
+
+        code_verifier:
+          codeVerifier,
       });
 
-    const tokenResponse = await fetch(
-      "https://api.mercadolibre.com/oauth/token",
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type":
-            "application/x-www-form-urlencoded",
-        },
-        body: tokenBody,
-      }
-    );
+    const tokenResponse =
+      await fetch(
+        "https://api.mercadolibre.com/oauth/token",
+        {
+          method: "POST",
+
+          headers: {
+            Accept:
+              "application/json",
+
+            "Content-Type":
+              "application/x-www-form-urlencoded",
+          },
+
+          body: tokenBody,
+        }
+      );
 
     const tokenData =
       await tokenResponse.json();
@@ -131,40 +267,61 @@ export default async function handler(req, res) {
       !tokenResponse.ok ||
       !tokenData.access_token
     ) {
-      return res.status(
-        tokenResponse.status || 400
-      ).json({
-        success: false,
-        error:
-          tokenData.message ||
-          tokenData.error ||
-          "Não foi possível obter o token do Mercado Livre.",
-      });
+      return res
+        .status(
+          tokenResponse.status ||
+            400
+        )
+        .json({
+          success: false,
+
+          error:
+            tokenData.message ||
+            tokenData.error ||
+            "Não foi possível obter o token do Mercado Livre.",
+        });
     }
 
-    const userResponse = await fetch(
-      "https://api.mercadolibre.com/users/me",
-      {
-        headers: {
-          Authorization:
-            `Bearer ${tokenData.access_token}`,
-        },
-      }
-    );
+    const userResponse =
+      await fetch(
+        "https://api.mercadolibre.com/users/me",
+        {
+          headers: {
+            Authorization:
+              `Bearer ${tokenData.access_token}`,
+          },
+        }
+      );
 
     const userData =
       await userResponse.json();
 
     if (!userResponse.ok) {
       return res
-        .status(userResponse.status)
+        .status(
+          userResponse.status
+        )
         .json({
           success: false,
+
           error:
             userData.message ||
             "Não foi possível consultar a conta do Mercado Livre.",
         });
     }
+
+    const marketplaceUserId =
+      String(userData.id);
+
+    const existingConnection =
+      await findConnection(
+        marketplaceUserId
+      );
+
+    const kerptaUserId =
+      await ensureKerptaUser(
+        existingConnection
+      );
 
     const accessTokenEncrypted =
       encryptToken(
@@ -172,52 +329,70 @@ export default async function handler(req, res) {
       );
 
     const refreshTokenEncrypted =
-      encryptToken(
-        tokenData.refresh_token
-      );
+      tokenData.refresh_token
+        ? encryptToken(
+            tokenData.refresh_token
+          )
+        : null;
 
     const tokenExpiresAt =
       tokenData.expires_in
         ? new Date(
             Date.now() +
-              tokenData.expires_in * 1000
+              tokenData.expires_in *
+                1000
           ).toISOString()
         : null;
 
+    const connectionData = {
+      marketplace:
+        "mercadolivre",
+
+      marketplace_user_id:
+        marketplaceUserId,
+
+      kerpta_user_id:
+        kerptaUserId,
+
+      account_name:
+        userData.nickname ||
+        null,
+
+      access_token_encrypted:
+        accessTokenEncrypted,
+
+      token_expires_at:
+        tokenExpiresAt,
+
+      status:
+        "active",
+
+      last_sync_at:
+        new Date()
+          .toISOString(),
+
+      updated_at:
+        new Date()
+          .toISOString(),
+    };
+
+    if (
+      refreshTokenEncrypted
+    ) {
+      connectionData
+        .refresh_token_encrypted =
+        refreshTokenEncrypted;
+    }
+
     const {
-      error: databaseError,
+      error:
+        databaseError,
     } = await supabase
       .from(
         "marketplace_connections"
       )
       .upsert(
-        {
-          marketplace:
-            "mercadolivre",
-
-          marketplace_user_id:
-            String(userData.id),
-
-          account_name:
-            userData.nickname || null,
-
-          access_token_encrypted:
-            accessTokenEncrypted,
-
-          refresh_token_encrypted:
-            refreshTokenEncrypted,
-
-          token_expires_at:
-            tokenExpiresAt,
-
-          status: "active",
-
-          last_sync_at:
-            new Date().toISOString(),
-
-          updated_at:
-            new Date().toISOString(),
-        },
+        connectionData,
         {
           onConflict:
             "marketplace,marketplace_user_id",
@@ -230,43 +405,70 @@ export default async function handler(req, res) {
         databaseError
       );
 
-      return res.status(500).json({
-        success: false,
-        error:
-          "A autorização foi concluída, mas não foi possível salvar a conexão.",
-      });
+      return res
+        .status(500)
+        .json({
+          success: false,
+
+          error:
+            "A autorização foi concluída, mas não foi possível salvar a conexão.",
+        });
     }
 
-    res.setHeader("Set-Cookie", [
-      clearCookie(
-        "kerpta_ml_oauth_state"
-      ),
-      clearCookie(
-        "kerpta_ml_code_verifier"
-      ),
-    ]);
+    res.setHeader(
+      "Set-Cookie",
+      [
+        clearCookie(
+          "kerpta_ml_oauth_state"
+        ),
 
-    return res.status(200).json({
-      success: true,
+        clearCookie(
+          "kerpta_ml_code_verifier"
+        ),
 
-      account: {
-        id: userData.id,
-        nickname:
-          userData.nickname,
-        siteId:
-          userData.site_id,
-      },
-    });
+        createSessionCookie(
+          kerptaUserId
+        ),
+      ]
+    );
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+
+        user: {
+          id:
+            kerptaUserId,
+
+          plan:
+            "free",
+        },
+
+        account: {
+          id:
+            userData.id,
+
+          nickname:
+            userData.nickname,
+
+          siteId:
+            userData.site_id,
+        },
+      });
   } catch (error) {
     console.error(
       "Erro OAuth Mercado Livre:",
       error
     );
 
-    return res.status(500).json({
-      success: false,
-      error:
-        "Erro interno durante a conexão com o Mercado Livre.",
-    });
+    return res
+      .status(500)
+      .json({
+        success: false,
+
+        error:
+          "Erro interno durante a conexão com o Mercado Livre.",
+      });
   }
 }
