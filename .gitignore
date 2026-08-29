@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+.vscode/
+.DS_Store
+Thumbs.db
+
+apps/web/node_modules/
+apps/api/node_modules/
+packages/core/node_modules/
+
+apps/web/dist/
