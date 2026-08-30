@@ -43,7 +43,8 @@ export default async function handler(
         `
           id,
           status,
-          plan
+          plan,
+          onboarding_completed
         `
       )
       .eq(
@@ -100,6 +101,7 @@ export default async function handler(
       return res.status(500).json({
         success: false,
         authenticated: false,
+
         error:
           "Não foi possível consultar a conexão.",
       });
@@ -117,8 +119,16 @@ export default async function handler(
       authenticated: true,
 
       user: {
-        id: user.id,
-        plan: user.plan,
+        id:
+          user.id,
+
+        plan:
+          user.plan,
+
+        onboardingCompleted:
+          Boolean(
+            user.onboarding_completed
+          ),
       },
 
       marketplace: {
