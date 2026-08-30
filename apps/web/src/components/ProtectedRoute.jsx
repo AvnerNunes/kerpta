@@ -1,5 +1,6 @@
 import {
   Navigate,
+  useLocation,
 } from "react-router-dom";
 
 import {
@@ -9,9 +10,13 @@ import {
 function ProtectedRoute({
   children,
 }) {
+  const location =
+    useLocation();
+
   const {
     authenticated,
     loading,
+    user,
   } = useSession();
 
   if (loading) {
@@ -36,6 +41,36 @@ function ProtectedRoute({
     return (
       <Navigate
         to="/login"
+        replace
+      />
+    );
+  }
+
+  const isOnboarding =
+    location.pathname ===
+    "/onboarding";
+
+  if (
+    !user
+      ?.onboardingCompleted &&
+    !isOnboarding
+  ) {
+    return (
+      <Navigate
+        to="/onboarding"
+        replace
+      />
+    );
+  }
+
+  if (
+    user
+      ?.onboardingCompleted &&
+    isOnboarding
+  ) {
+    return (
+      <Navigate
+        to="/produto"
         replace
       />
     );

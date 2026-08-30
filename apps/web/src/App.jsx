@@ -13,6 +13,7 @@ import {
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 import LoginPage from "./pages/LoginPage.jsx";
+import OnboardingPage from "./pages/OnboardingPage.jsx";
 import ProductPage from "./pages/ProductPage.jsx";
 import ParametersPage from "./pages/ParametersPage.jsx";
 import ResultPage from "./pages/ResultPage.jsx";
@@ -54,6 +55,15 @@ function App() {
           path="/auth/mercadolivre/callback"
           element={
             <MercadoLivreCallbackPage />
+          }
+        />
+
+        <Route
+          path="/onboarding"
+          element={
+            <PrivatePage>
+              <OnboardingPage />
+            </PrivatePage>
           }
         />
 
